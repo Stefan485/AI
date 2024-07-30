@@ -12,8 +12,9 @@ class GPTconfig:
     n_embd: int = 288
     n_head: int = 12
     n_layer: int = 12
-    block_size: int = 512
+    block_size: int = 1024
     vocab_size: int = 50304
+    dropout: float = 0.0
 
 
 class FeedForward(nn.Module):
@@ -23,13 +24,13 @@ class FeedForward(nn.Module):
         self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd)
         self.gelu    = nn.GELU(approximate='tanh')
         self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd)
-        # self.c_proj.LLMC_RESIDUAL_SCALE_FLAG = 1
-        self.c_proj.NANOGPT_SCALE_INIT = 1
+        self.drop = nn.Dropout(config.dropout)
 
     def forward(self, x):
         x = self.c_fc(x)
         x = self.gelu(x)
         x = self.c_proj(x)
+        x = self.drop(x)
         return x
     
 
@@ -41,10 +42,14 @@ class CausalSelfAttention(nn.Module):
 
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
-        self.c_proj.NANOGPT_SCALE_INIT = 1
+        self.attn_drop = nn.Dropout(config.dropout)
+        self.resid_drop = nn.Dropout(config.dropout)
+        # self.c_proj.NANOGPT_SCALE_INIT = 1
+        self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
 
         self.n_head = config.n_head
         self.n_embd = config.n_embd
+        self.dropout = config.dropout
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                                      .view(1, 1, config.block_size, config.block_size))
 
@@ -60,14 +65,20 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
 
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
-        att = F.softmax(att, dim=-1)
+        if self.flash:
+            y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.dropout
+                                                                  if self.training else 0, is_causal=True)
 
-        y = att @ v
+        else:
+            att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+            att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+            att = F.softmax(att, dim=-1)
+            att = self.attn_drop(att)
+            y = att @ v
+    
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.c_proj(y)
-        return y
+        return self.resid_drop(y)
 
     
 class Block(nn.Module):
@@ -100,8 +111,20 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         
         self.transformer.wte.weight = self.lm_head.weight
+        for pn, p in self.named_parameters():
+            if pn.endswith('c_proj.weight'):
+                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
         
+        print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
+
         self.apply(self._init_weights)
+
+    def get_num_params(self, non_embedding=True):
+
+        n_params = sum(p.numel() for p in self.parameters())
+        if non_embedding:
+            n_params -= self.transformer.wpe.weight.numel()
+        return n_params
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -164,10 +187,11 @@ class GPT(nn.Module):
         return model
 
     def forward(self, idx, targets=None):
+        device = idx.device
         B, T = idx.size()
         assert T <= self.config.block_size, 'Cannot forward, model block size is exhausted.'
 
-        pos = torch.arange(0, T, dtype=torch.long, device=idx.device)
+        pos = torch.arange(0, T, dtype=torch.long, device=device)
         tok_emb = self.transformer.wte(idx)
         pos_emb = self.transformer.wpe(pos)
         x = tok_emb + pos_emb

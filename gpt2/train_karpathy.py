@@ -2,11 +2,28 @@ import torch
 import tiktoken
 from torch.nn import functional as F
 from model_karpathy import GPT, GPTConfig
-# from gpt2 import GPTconfig
+import math
 import time
 import wandb
 
 wandb.login()
+
+max_lr = 6e-4
+min_lr = max_lr * 0.1
+num_return_sequece = 5
+max_new_tokens = 50
+max_steps = 100
+warmup_steps = 10
+enc = tiktoken.get_encoding('gpt2')
+config = GPTConfig()
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f'using device: {device}')
+B = 4 # batch size
+T = 512 # sequence length
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+enc = tiktoken.get_encoding('gpt2')
+config = GPTConfig()
 
 wandb.init(project='gpt2',
            config={
@@ -18,11 +35,6 @@ wandb.init(project='gpt2',
                 'dropout': 0.0
            })
 
-enc = tiktoken.get_encoding('gpt2')
-config = GPTConfig()
-
-torch.manual_seed(42)
-torch.cuda.manual_seed(42)
 
 class DataLoaderLite:
 
@@ -50,33 +62,29 @@ class DataLoaderLite:
             self.current_position = 0
         return x, y 
 
-num_return_sequece = 5
-max_length = 50
 
-device = 'cpu'
-if torch.cuda.is_available():
-    device = 'cuda'
-
-print(f'using device: {device}')
-B = 4
-T = 512
 train_loader = DataLoaderLite(B, T)
 torch.set_float32_matmul_precision('high')
 
-# model = GPTCustom.from_pretrained('gpt2')
 model = GPT(config)
 model = model.to(device)
-# model = torch.compile(model)
-def get_lr(step):
-    if step == 0:
-        return 3e-4
-    return config.n_embd ** -0.5 * min(step ** -0.5, step * 4000 ** -1.5)
 
+def get_lr(step):
+    if step < warmup_steps:
+        return 3e-4 * (step + 1) / warmup_steps
+    
+    if step > max_steps:
+        return min_lr
+    
+    decay_ratio = (step - warmup_steps) / (max_steps - warmup_steps)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    return min_lr + coeff * (max_lr - min_lr) * coeff
 
 #from gpt paper
 optimizer = model.configure_optimizers(0.1, 6e-4, (0.9, 0.95), device)
 
-for step in range(max_length):
+for step in range(max_steps):
     t0 = time.time()
 
     x, y = train_loader.next_batch()    
@@ -86,12 +94,15 @@ for step in range(max_length):
     logits, loss = model(x, y)
     loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    lr = get_lr(step)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
     optimizer.step()
     torch.cuda.synchronize()
     t1 = time.time()
     dt = (t1 - t0)*1000
-    metrics = {'loss': loss.item(), 'lr': get_lr(step)}
-    if step + 1 < max_length:
+    metrics = {'loss': loss.item(), 'lr': lr}
+    if step + 1 < max_steps:
         wandb.log(metrics)
     print(f'step: {step}, loss: {loss.item(),} dt: {dt:.2f}ms')
 
@@ -102,10 +113,10 @@ tokens = torch.tensor(tokens, dtype=torch.long)
 tokens = tokens.unsqueeze(0).repeat(num_return_sequece, 1)
 x = tokens.to(device)
 
-x = model.generate(x, max_length, temperature=1.0, top_k=50)
+x = model.generate(x, max_new_tokens, temperature=1.0, top_k=50)
 
 for i in range(num_return_sequece):
-    tokens = x[i, :max_length].tolist()
+    tokens = x[i, :max_new_tokens].tolist()
     decode = enc.decode(tokens)
     print("> ", decode)
 

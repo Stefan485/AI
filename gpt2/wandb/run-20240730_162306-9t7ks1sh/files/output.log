@@ -1,9 +1,0 @@
-
-using device: cuda
-loaded: 11909059
-1 epoch = 5814 batches
-Traceback (most recent call last):
-  File "D:\Dev\Code\Playground\AI\gpt2\train.py", line 91, in <module>
-    metrics = {'loss': loss.item(), 'lr': get_lr(i)}
-                                                 ^
-NameError: name 'i' is not defined
