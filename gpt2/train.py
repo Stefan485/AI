@@ -29,7 +29,7 @@ class DataLoaderLite:
         self.B = B
         self.T = T
 
-        with open('../input.txt', 'r', encoding='utf-8') as f:
+        with open('../input2.txt', 'r', encoding='utf-8') as f:
             text = f.read()
         tokens = enc.encode(text)
         self.tokens = torch.tensor(tokens, dtype=torch.long)
@@ -63,7 +63,7 @@ train_loader = DataLoaderLite(B, T)
 torch.set_float32_matmul_precision('high')
 
 # model = GPTCustom.from_pretrained('gpt2')
-model = GPT(GPTconfig())
+model = GPT(config)
 model = model.to(device)
 # model = torch.compile(model)
 def get_lr(step):
@@ -98,7 +98,7 @@ tokens = torch.tensor(tokens, dtype=torch.long)
 tokens = tokens.unsqueeze(0).repeat(num_return_sequece, 1)
 x = tokens.to(device)
 
-
+model.eval()
 while x.size(1) < max_length:
 
     with torch.no_grad():

@@ -30,7 +30,7 @@ class DataLoaderLite:
         self.B = B
         self.T = T
 
-        with open('../input.txt', 'r', encoding='utf-8') as f:
+        with open('../input2.txt', 'r', encoding='utf-8') as f:
             text = f.read()
         tokens = enc.encode(text)
         self.tokens = torch.tensor(tokens, dtype=torch.long)
@@ -95,10 +95,14 @@ for step in range(max_length):
         wandb.log(metrics)
     print(f'step: {step}, loss: {loss.item(),} dt: {dt:.2f}ms')
 
+model.eval()
+
 tokens = enc.encode("Hello I'm a language model,")
 tokens = torch.tensor(tokens, dtype=torch.long)
 tokens = tokens.unsqueeze(0).repeat(num_return_sequece, 1)
 x = tokens.to(device)
+
+x = model.generate(x, max_length, temperature=1.0, top_k=50)
 
 for i in range(num_return_sequece):
     tokens = x[i, :max_length].tolist()

@@ -1,0 +1,59 @@
+
+using device: cuda
+loaded: 6829285
+1 epoch = 3334 batches
+step: 0, loss: (10.86182689666748,) dt: 878.44ms
+step: 1, loss: (10.701248168945312,) dt: 613.03ms
+step: 2, loss: (10.528791427612305,) dt: 371.37ms
+step: 3, loss: (10.355515480041504,) dt: 404.93ms
+step: 4, loss: (10.270218849182129,) dt: 424.47ms
+step: 5, loss: (10.171253204345703,) dt: 420.06ms
+step: 6, loss: (10.096632957458496,) dt: 400.18ms
+step: 7, loss: (10.031087875366211,) dt: 385.91ms
+step: 8, loss: (9.971467971801758,) dt: 386.48ms
+step: 9, loss: (9.8770112991333,) dt: 398.78ms
+step: 10, loss: (9.782221794128418,) dt: 393.60ms
+step: 11, loss: (9.569631576538086,) dt: 376.72ms
+step: 12, loss: (9.545032501220703,) dt: 376.31ms
+step: 13, loss: (9.355205535888672,) dt: 373.57ms
+step: 14, loss: (9.278752326965332,) dt: 363.54ms
+step: 15, loss: (11.59877872467041,) dt: 361.36ms
+step: 16, loss: (9.029684066772461,) dt: 376.25ms
+step: 17, loss: (9.089997291564941,) dt: 382.75ms
+step: 18, loss: (8.887369155883789,) dt: 376.33ms
+step: 19, loss: (8.779411315917969,) dt: 398.59ms
+step: 20, loss: (8.725653648376465,) dt: 387.81ms
+step: 21, loss: (8.589616775512695,) dt: 360.17ms
+step: 22, loss: (8.539271354675293,) dt: 378.80ms
+step: 23, loss: (8.334770202636719,) dt: 394.77ms
+step: 24, loss: (8.333024978637695,) dt: 359.28ms
+step: 25, loss: (8.159814834594727,) dt: 376.91ms
+step: 26, loss: (8.027595520019531,) dt: 393.09ms
+step: 27, loss: (8.046652793884277,) dt: 391.16ms
+step: 28, loss: (7.890867233276367,) dt: 372.36ms
+step: 29, loss: (7.731057167053223,) dt: 384.95ms
+step: 30, loss: (7.6709089279174805,) dt: 373.73ms
+step: 31, loss: (7.598664283752441,) dt: 357.84ms
+step: 32, loss: (7.462993621826172,) dt: 362.73ms
+step: 33, loss: (7.531341075897217,) dt: 394.97ms
+step: 34, loss: (7.3677191734313965,) dt: 375.95ms
+step: 35, loss: (7.195135593414307,) dt: 384.73ms
+step: 36, loss: (7.098974227905273,) dt: 381.59ms
+step: 37, loss: (7.072439670562744,) dt: 386.34ms
+step: 38, loss: (7.0999932289123535,) dt: 381.07ms
+step: 39, loss: (6.8547821044921875,) dt: 361.50ms
+step: 40, loss: (6.553450584411621,) dt: 380.13ms
+step: 41, loss: (7.046466827392578,) dt: 376.63ms
+step: 42, loss: (6.896279335021973,) dt: 374.14ms
+step: 43, loss: (6.858963489532471,) dt: 355.90ms
+step: 44, loss: (6.774503231048584,) dt: 357.32ms
+step: 45, loss: (6.604246139526367,) dt: 351.33ms
+step: 46, loss: (6.569671630859375,) dt: 352.47ms
+step: 47, loss: (6.659987926483154,) dt: 372.43ms
+step: 48, loss: (6.482239723205566,) dt: 368.21ms
+step: 49, loss: (6.639655590057373,) dt: 372.28ms
+>  Hello I'm a language model, This the,? the this you this do be, time, " just, the you an you. a the you!  </=> of your is on of= of on all, and a this
+>  Hello I'm a language model, for? would is.  callt are. make can and is scam you  I can the?&#39; so you&& the will of, the."  would the scams for,t
+>  Hello I'm a language model,.  it can would it up do the that."  a&#39;=!  if the tos on the  so on the that  " you it the a."  that the ont
+>  Hello I'm a language model,, can scam you the, a it this with is is scam it, so & I it scam!  as be the. is& an &." them& the not on do be, to is the that
+>  Hello I'm a language model, is!  so the can, have in it up the this scam scam I you. . on a so the for will on  you tobr do, have= to that,, thebr> just
