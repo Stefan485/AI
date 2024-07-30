@@ -6,6 +6,9 @@ train.py - Script for training my model\
 train_karpathy.py - Script for training karpathy's model\
 originalT.py - Implementation of decoder only tranfsormer following [Attention is all you need](https://arxiv.org/pdf/1706.03762)
 
+Stats:\
+![text](https://github.com/Stefan485/AI/blob/main/images/loss_lr.png)
+
 # llama
 
 llama.py - My implementation of llama (following meta's [paper](https://arxiv.org/pdf/2302.13971v1))\
