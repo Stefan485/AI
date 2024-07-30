@@ -15,6 +15,17 @@ class GPTconfig:
     block_size: int = 1024
     vocab_size: int = 50304
     dropout: float = 0.0
+    bias = True
+
+class LayerNorm(nn.Module):
+
+    def __init__(self, ndim, bias):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(ndim))
+        self.bias = nn.Parameter(torch.zeros(ndim)) if bias else None
+
+    def forward(self, input):
+        return F.layer_norm(input, self.weight.shape, self.weight, self.bias, 1e-5)
 
 
 class FeedForward(nn.Module):
@@ -22,7 +33,7 @@ class FeedForward(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd)
-        self.gelu    = nn.GELU(approximate='tanh')
+        self.gelu    = nn.GELU()
         self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd)
         self.drop = nn.Dropout(config.dropout)
 
@@ -87,7 +98,7 @@ class Block(nn.Module):
         super().__init__()
         self.ln_1 = nn.LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
-        self.ln_2 = nn.LayerNorm(config.n_embd)
+        self.ln_2 = nn.LayerNorm(config.n_embd, bias=config.bias)
         self.mlp = FeedForward(config)
 
     def forward(self, x):
@@ -105,7 +116,7 @@ class GPT(nn.Module):
             wte = nn.Embedding(config.vocab_size, config.n_embd),
             wpe = nn.Embedding(config.block_size, config.n_embd),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = nn.LayerNorm(config.n_embd),
+            ln_f = nn.LayerNorm(config.n_embd, bias=config.bias),
         ))
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
@@ -206,3 +217,20 @@ class GPT(nn.Module):
         if targets is not None:
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
         return logits, loss
+    
+    #smaller and delayed spike in loss (after that pretty much the same as regular use od AdamW in train script)
+    def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
+
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        param_dict = {pn: p for pn, p in param_dict.items() if p.requires_grad}
+
+        decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
+        nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+        optim_groups = [
+            {'params': decay_params, 'weight_decay': weight_decay},
+            {'params': nodecay_params, 'weight_decay': 0.0}
+        ]
+
+        # Create AdamW optimizer and use the fused version if it is available
+        optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, fused=True)
+        return optimizer

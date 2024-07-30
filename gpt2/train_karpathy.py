@@ -6,8 +6,6 @@ import math
 import time
 import wandb
 
-wandb.login()
-
 max_lr = 6e-4
 min_lr = max_lr * 0.1
 num_return_sequece = 5
@@ -18,23 +16,12 @@ enc = tiktoken.get_encoding('gpt2')
 config = GPTConfig()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'using device: {device}')
-B = 4 # batch size
-T = 512 # sequence length
+B = 2 # batch size
+T = 1024 # sequence length
 torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 enc = tiktoken.get_encoding('gpt2')
 config = GPTConfig()
-
-wandb.init(project='gpt2',
-           config={
-                'n_embd': 288,
-                'n_head': 12,
-                'n_layer': 12,
-                'block_size': 512,
-                'vocab_size': 50304,
-                'dropout': 0.0
-           })
-
 
 class DataLoaderLite:
 
@@ -62,7 +49,6 @@ class DataLoaderLite:
             self.current_position = 0
         return x, y 
 
-
 train_loader = DataLoaderLite(B, T)
 torch.set_float32_matmul_precision('high')
 
@@ -84,26 +70,40 @@ def get_lr(step):
 #from gpt paper
 optimizer = model.configure_optimizers(0.1, 6e-4, (0.9, 0.95), device)
 
+wandb.login()
+
+wandb.init(project='gpt2',
+           config={
+                'n_embd': 288,
+                'n_head': 12,
+                'n_layer': 12,
+                'block_size': 512,
+                'vocab_size': 50304,
+                'dropout': 0.0
+           })
+
 for step in range(max_steps):
     t0 = time.time()
 
     x, y = train_loader.next_batch()    
     x, y = x.to(device), y.to(device)
+
     optimizer.zero_grad()
-    # with torch.autocast(device_type=device, dtype=torch.bfloat16):
     logits, loss = model(x, y)
     loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
     lr = get_lr(step)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
     optimizer.step()
+
     torch.cuda.synchronize()
     t1 = time.time()
     dt = (t1 - t0)*1000
+
     metrics = {'loss': loss.item(), 'lr': lr}
-    if step + 1 < max_steps:
-        wandb.log(metrics)
+    wandb.log(metrics)
     print(f'step: {step}, loss: {loss.item(),} dt: {dt:.2f}ms')
 
 model.eval()
