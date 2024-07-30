@@ -5,7 +5,12 @@ from dataclasses import dataclass
 import torchtune
 import math
 import time
-import llama.tokenizer as tokenizer
+# from transformers import AutoTokenizer
+import tokenizer
+
+
+# tokenizers = AutoTokenizer.from_pretrained("/net/llm-compiles-high-perf/project-apex/mutable/llama3/Meta-Llama-3-8B-Instruct")
+enc = tokenizer.Tokenizer('tiktoken_model.py')
 
 
 class SwiGLU(nn.Module):
@@ -150,7 +155,7 @@ class DataLoaderLite:
         self.T = T
 
         #llama 3 tokenizer
-        enc = tokenizer.Tokenizer()
+        # enc = tokenizer.Tokenizer()
         #ds = load_dataset("breadlicker45/youtube-comments-v2")
 
         # data = ds['train']['text']
@@ -233,8 +238,12 @@ model.eval()
 
 num_return_sequence = 5
 max_length = 50
-enc = tokenizer.Tokenizer()
-tokens = enc.encode('LLama test')
+# model_id = "meta-llama/Meta-Llama-3-8B"
+# tokenizers = AutoTokenizer.from_pretrained("/net/llm-compiles-high-perf/project-apex/mutable/llama3/Meta-Llama-3-8B-Instruct")
+# tokens = tokenizers.encode("LLAMA TEST")
+# pipeline = transformers.pipeline("text-generation", model=model_id, model_kwargs={"torch_dtype": torch.bfloat16}, device_map="auto")
+# tokens = pipeline("Hey how are you doing today?")
+tokens = enc.encode("Hey how are you doing today?")
 tokens = torch.tensor(tokens, dtype=torch.long)
 tokens = tokens.unsqueeze(0).repeat(num_return_sequence, 1)
 x = tokens.to(device)
