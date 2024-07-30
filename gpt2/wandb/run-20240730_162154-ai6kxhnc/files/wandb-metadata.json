@@ -1,0 +1,48 @@
+{
+    "os": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.3",
+    "heartbeatAt": "2024-07-30T14:21:55.541805",
+    "startedAt": "2024-07-30T14:21:54.473439",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "D:\\Dev\\Code\\Playground\\AI\\gpt2\\train.py",
+    "codePathLocal": "train.py",
+    "codePath": "gpt2\\train.py",
+    "git": {
+        "remote": "https://github.com/Stefan485/AI.git",
+        "commit": "91c862a2791c10e10595589ebc39d1444052fa02"
+    },
+    "email": "obradovic.stefan485@gmail.com",
+    "root": "D:/Dev/Code/Playground/AI",
+    "host": "st",
+    "username": "stefa",
+    "executable": "D:\\Anaconda\\envs\\AI\\python.exe",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 2592.0,
+        "min": 0.0,
+        "max": 2592.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2592.0,
+            "min": 0.0,
+            "max": 2592.0
+        }
+    ],
+    "disk": {},
+    "gpu": "NVIDIA GeForce GTX 1650",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce GTX 1650",
+            "memory_total": 4294967296
+        }
+    ],
+    "memory": {
+        "total": 15.909957885742188
+    }
+}

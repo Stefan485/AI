@@ -1,0 +1,10 @@
+
+using device: cuda
+loaded: 11909059
+1 epoch = 5814 batches
+number of parameters: 123.69M
+Traceback (most recent call last):
+  File "D:\Dev\Code\Playground\AI\gpt2\train_karpathy.py", line 76, in <module>
+    optimizer = model.configure_optimizers(3e-4)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: GPT.configure_optimizers() missing 3 required positional arguments: 'learning_rate', 'betas', and 'device_type'

@@ -1,0 +1,12 @@
+
+using device: cuda
+loaded: 11909059
+1 epoch = 5814 batches
+Traceback (most recent call last):
+  File "D:\Dev\Code\Playground\AI\gpt2\train_karpathy.py", line 67, in <module>
+    model = GPT(GPTconfig())
+            ^^^^^^^^^^^^^^^^
+  File "D:\Dev\Code\Playground\AI\gpt2\model_karpathy.py", line 129, in __init__
+    drop = nn.Dropout(config.dropout),
+                      ^^^^^^^^^^^^^^
+AttributeError: 'GPTconfig' object has no attribute 'dropout'

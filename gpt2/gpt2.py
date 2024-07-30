@@ -9,11 +9,11 @@ import time
 
 @dataclass
 class GPTconfig:
-    n_embd: int = 768
+    n_embd: int = 288
     n_head: int = 12
     n_layer: int = 12
-    block_size: int = 1024
-    vocab_size: int = 50257
+    block_size: int = 512
+    vocab_size: int = 50304
 
 
 class FeedForward(nn.Module):
@@ -182,97 +182,3 @@ class GPT(nn.Module):
         if targets is not None:
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
         return logits, loss
-    
-
-
-class DataLoaderLite:
-
-    def __init__(self, B, T):
-        self.B = B
-        self.T = T
-
-        enc = tiktoken.get_encoding('gpt2')
-        # ds = load_dataset("Cropinky/rap_lyrics_english")     
-
-        # data = ds['train']['text']
-        # text = ''.join(' ' + x for x in data)
-        # f = open('input.txt', 'w', encoding='utf-8')
-        # f.write(text)
-        # f.close()
-        with open('input.txt', 'r', encoding='utf-8') as f:
-            text = f.read()
-        tokens = enc.encode(text)
-        self.tokens = torch.tensor(tokens, dtype=torch.long)
-        print(f"loaded: {len(self.tokens)}")
-        print(f'1 epoch = {len(self.tokens) // (B * T)} batches')
-
-        self.current_position = 0
-
-    def next_batch(self):
-        B, T = self.B, self.T
-        buf = self.tokens[self.current_position:self.current_position + B * T + 1]
-        x = buf[:-1].view(B, T)
-        y = buf[1:].view(B, T)
-        self.current_position += B * T
-
-        if self.current_position + B * T + 1 >= len(self.tokens):
-            self.current_position = 0
-        return x, y    
-
-num_return_sequece = 5
-max_length = 30
-
-device = 'cpu'
-if torch.cuda.is_available():
-    device = 'cuda'
-
-
-print(f'using device: {device}')
-
-train_loader = DataLoaderLite(4, 1024)
-torch.set_float32_matmul_precision('high')
-
-# model = GPTCustom.from_pretrained('gpt2')
-model = GPT(GPTconfig())
-model = model.to(device)
-# model = torch.compile(model)
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-
-for i in range(50):
-    t0 = time.time()
-    x, y = train_loader.next_batch()    
-    x, y = x.to(device), y.to(device)
-    optimizer.zero_grad()
-    # with torch.autocast(device_type=device, dtype=torch.bfloat16):
-    logits, loss = model(x, y)
-    loss.backward()
-    optimizer.step()
-    torch.cuda.synchronize()
-    t1 = time.time()
-    dt = (t1 - t0)*1000
-    print(f'step: {i}, loss: {loss.item(),} dt: {dt:.2f}ms')
-
-import sys; sys.exit(0)
-
-torch.manual_seed(42)
-torch.cuda.manual_seed(42)
-
-while x.size(1) < max_length:
-
-    with torch.no_grad():
-
-        logits = model(x)
-
-        logits = logits[:, -1, :]
-        probs = F.softmax(logits, dim=-1)
-
-        topk_probs, topk_indices = torch.topk(probs, k=50, dim=-1)
-
-        ix = torch.multinomial(topk_probs, 1)
-        xcol = torch.gather(topk_indices, -1, ix)
-
-        x = torch.cat((x, xcol), dim=1)
-
-
-for i in range(num_return_sequece):
-    tokens = x[i, :max_length].tolist()
