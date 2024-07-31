@@ -118,9 +118,13 @@ optimizer_kar = model_kar.configure_optimizers(0.1, max_lr, (0.9, 0.95), device)
 
 
 def compare_weights(weights1, weights2):
+    assert weights1.keys() == weights2.keys(), 'Models have different parameters'
     differences = {}
+    # keys = [x for x in weights1.keys() if 'bias' not in x]
+    # s = set(keys)
     s = set(weights1.keys())
-    s = s.union(set(weights2.keys())) 
+    # assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
+    #             in zip(weights1.items(), weights2.items())), 'Models have different weights'
     for k in s:
         w1 = weights1[k]
         w1 = w1.to('cpu').numpy()
@@ -129,6 +133,7 @@ def compare_weights(weights1, weights2):
         diff = np.linalg.norm(w1 - w2)
         differences[k] = diff
 
+    differences = dict(sorted(differences.items()))
     print(differences)
 #used for training both and comparing their weights
 for step in range(max_steps):
