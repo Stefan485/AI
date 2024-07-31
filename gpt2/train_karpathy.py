@@ -52,13 +52,13 @@ class DataLoaderLite:
 train_loader = DataLoaderLite(B, T)
 torch.set_float32_matmul_precision('high')
 
-model = GPT(config)
-# model = GPT.from_pretrained('gpt2')
+# model = GPT(config)
+model = GPT.from_pretrained('gpt2')
 model = model.to(device)
 
 def get_lr(step):
     if step < warmup_steps:
-        return 3e-4 * (step + 1) / warmup_steps
+        return max_lr * (step + 1) / warmup_steps
     
     if step > max_steps:
         return min_lr
@@ -79,8 +79,7 @@ wandb.init(project='gpt2',
                 'n_head': 12,
                 'n_layer': 12,
                 'block_size': 1024,
-                'vocab_size': 50304,
-                'dropout': 0.0
+                'vocab_size': 50257,
            })
 
 for step in range(max_steps):

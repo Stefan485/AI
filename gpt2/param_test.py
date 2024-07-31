@@ -57,7 +57,7 @@ karpathy_gpt = karpathy_gpt.to(device)
 
 def get_lr(step):
     if step < warmup_steps:
-        return 3e-4 * (step + 1) / warmup_steps
+        return max_lr * (step + 1) / warmup_steps
     
     if step > max_steps:
         return min_lr
@@ -73,11 +73,17 @@ optimizer_karpathy_gpt = karpathy_gpt.configure_optimizers(weight_decay=0.1, lea
 def compare_weights(weights1, weights2):
     assert weights1.keys() == weights2.keys(), 'Models have different parameters'
     differences = {}
-    # keys = [x for x in weights1.keys() if 'bias' not in x]
-    # s = set(keys)
-    s = set(weights1.keys())
-    # assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
-    #             in zip(weights1.items(), weights2.items())), 'Models have different weights'
+    tensors_of_intrest = ['mlp.c_proj', 'mlp.c_fc']
+    keys = []
+    for x in weights1.keys():
+        if any(y in x for y in tensors_of_intrest):
+            keys.append(x)
+   
+    print(keys)
+    s = set(keys)
+    # s = set(weights1.keys())
+    assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
+                in zip(weights1.items(), weights2.items())), 'Models have different weights'
     # print("passed")
     for k in s:
         w1 = weights1[k]

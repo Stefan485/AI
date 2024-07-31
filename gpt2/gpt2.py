@@ -3,67 +3,28 @@ import torch.nn as nn
 from torch.nn import functional as F
 from dataclasses import dataclass
 from datasets import load_dataset
-import tiktoken
 import math
-import time
 
-torch.manual_seed(42)
-torch.cuda.manual_seed(42)
-
-@dataclass
-class GPTconfig:
-    n_embd: int = 768
-    n_head: int = 12
-    n_layer: int = 12
-    block_size: int = 1024
-    vocab_size: int = 50304
-    dropout: float = 0.0
-    bias: bool = True
-
-class LayerNorm(nn.Module):
-
-    def __init__(self, ndim, bias):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(ndim))
-        self.bias = nn.Parameter(torch.zeros(ndim)) if bias else None
+class NewGelu(nn.Module):
 
     def forward(self, input):
-        return F.layer_norm(input, self.weight.shape, self.weight, self.bias, 1e-5)
+        return 0.5 * input * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (input + 0.044715 * torch.pow(input, 3.0))))
 
-class FeedForward(nn.Module):
-
-    def __init__(self, config):
-        super().__init__()
-        self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
-        self.gelu = nn.GELU(approximate='tanh')
-        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
-        self.drop = nn.Dropout(config.dropout)
-
-    def forward(self, x):
-        x = self.c_fc(x)
-        x = self.gelu(x)
-        x = self.c_proj(x)
-        x = self.drop(x)
-        return x
-    
 class CausalSelfAttention(nn.Module):
 
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
 
-        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
-        self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
-        self.attn_drop = nn.Dropout(config.dropout)
-        self.resid_drop = nn.Dropout(config.dropout)
-        # self.c_proj.NANOGPT_SCALE_INIT = 1
-        self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
+        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
+        self.c_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.c_proj.LLMC_RESIDUAL_SCALE_FLAG = 1
 
+        self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
         self.n_head = config.n_head
         self.n_embd = config.n_embd
-        self.dropout = config.dropout
-        if not self.flash:
-            self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
+
+        self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                                      .view(1, 1, config.block_size, config.block_size))
 
     def forward(self, x):
@@ -79,33 +40,47 @@ class CausalSelfAttention(nn.Module):
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
 
         if self.flash:
-            y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.dropout
-                                                                  if self.training else 0, is_causal=True)
-
-        else:
-            att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-            att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
-            att = F.softmax(att, dim=-1)
-            att = self.attn_drop(att)
-            y = att @ v
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
     
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.c_proj(y)
-        return self.resid_drop(y)
+        return y
+
+class FeedForward(nn.Module):
+
+    def __init__(self, config):
+        super().__init__()
+        self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
+        self.gelu = NewGelu()
+        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
+
+    def forward(self, x):
+        x = self.c_fc(x)
+        x = self.gelu(x)
+        x = self.c_proj(x)
+        return x
 
 class Block(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.ln_1 = nn.LayerNorm(config.n_embd, config.bias)
+        self.ln_1 = nn.LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
-        self.ln_2 = nn.LayerNorm(config.n_embd, bias=config.bias)
+        self.ln_2 = nn.LayerNorm(config.n_embd)
         self.mlp = FeedForward(config)
 
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
+
+@dataclass
+class GPTconfig:
+    n_embd: int = 768
+    n_head: int = 12
+    n_layer: int = 12
+    block_size: int = 1024
+    vocab_size: int = 50257
 
 class GPT(nn.Module):
 
@@ -117,13 +92,17 @@ class GPT(nn.Module):
             wte = nn.Embedding(config.vocab_size, config.n_embd),
             wpe = nn.Embedding(config.block_size, config.n_embd),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = nn.LayerNorm(config.n_embd, bias=config.bias),
+            ln_f = nn.LayerNorm(config.n_embd),
         ))
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        self.lm_head.LLMC_SKIP_INIT = 1
+        self.transformer.wte.weight = self.lm_head.weight
+
+        self.init_rng = torch.Generator()
+        self.init_rng.manual_seed(42)
         self.apply(self._init_weights)
 
-        self.transformer.wte.weight = self.lm_head.weight
         for pn, p in self.named_parameters():
             if pn.endswith('c_proj.weight'):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
@@ -140,12 +119,36 @@ class GPT(nn.Module):
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            std = 0.02 if hasattr(module, 'LLMC_RESIDUAL_SCALE_FLAG') else 0.02/math.sqrt(2 * self.config.n_layer)
+
+            if not hasattr(module, 'LLMC_SKIP_INIT'):
+                torch.nn.init.normal_(module.weight, mean=0.0, std=std, generator=self.init_rng)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02, generator=self.init_rng)
 
+    def forward(self, idx, targets=None):
+        device = idx.device
+        B, T = idx.size()
+        assert T <= self.config.block_size, 'Cannot forward, model block size is exhausted.'
+
+        pos = torch.arange(0, T, dtype=torch.long, device=device)
+        tok_emb = self.transformer.wte(idx)
+        pos_emb = self.transformer.wpe(pos)
+        x = tok_emb + pos_emb
+
+        for block in self.transformer.h:
+            x = block(x)
+
+        x = self.transformer.ln_f(x)
+        logits = self.lm_head(x)
+        loss = None
+
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+        return logits, loss
+    
     @classmethod
     def from_pretrained(cls, model_type):
 
@@ -162,7 +165,6 @@ class GPT(nn.Module):
 
         config_args['vocab_size'] = 50257
         config_args['block_size'] = 1024
-        config_args['bias'] = True
 
         config = GPTconfig(**config_args)
         model = GPT(config)
@@ -193,27 +195,6 @@ class GPT(nn.Module):
                     sd[k].copy_(sd_hf[k])
 
         return model
-
-    def forward(self, idx, targets=None):
-        device = idx.device
-        B, T = idx.size()
-        assert T <= self.config.block_size, 'Cannot forward, model block size is exhausted.'
-
-        pos = torch.arange(0, T, dtype=torch.long, device=device)
-        tok_emb = self.transformer.wte(idx)
-        pos_emb = self.transformer.wpe(pos)
-        x = tok_emb + pos_emb
-
-        for block in self.transformer.h:
-            x = block(x)
-
-        x = self.transformer.ln_f(x)
-        logits = self.lm_head(x)
-        loss = None
-
-        if targets is not None:
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
-        return logits, loss
     
     #smaller and delayed spike in loss (after that pretty much the same as regular use od AdamW in train script)
     def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
