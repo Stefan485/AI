@@ -1,7 +1,7 @@
 # GPT2
 
 gpt2.py - My implementation of gpt2 [following Andrej Karpathy's video](https://www.youtube.com/watch?v=l8pRSuU81PU&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ)\
-model_karpathy.py - [Andrej Karpathy implementation](https://github.com/karpathy/nanoGPT/blob/master/model.py)\
+model_karpathy.py - [Andrej Karpathy implementation](https://github.com/karpathy/llm.c/blob/master/train_gpt2.py)\
 train.py - Script for training my model\
 train_karpathy.py - Script for training karpathy's model\
 originalT.py - Implementation of decoder only tranfsormer following [Attention is all you need](https://arxiv.org/pdf/1706.03762)
