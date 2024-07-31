@@ -4,7 +4,6 @@ from torch.nn import functional as F
 import gpt2
 import model_karpathy
 import math
-import numpy as np
 
 
 max_lr = 6e-4
@@ -49,9 +48,10 @@ class DataLoaderLite:
         return x, y 
     
 train_loader = DataLoaderLite(B, T)
-
-my_gpt = gpt2.GPT(gpt2.GPTconfig())
-karpathy_gpt = model_karpathy.GPT(model_karpathy.GPTConfig())
+# my_gpt = gpt2.GPT(gpt2.GPTconfig())
+my_gpt = gpt2.GPT.from_pretrained('gpt2')
+# karpathy_gpt = model_karpathy.GPT(model_karpathy.GPTConfig())
+karpathy_gpt = model_karpathy.GPT.from_pretrained('gpt2')
 my_gpt = my_gpt.to(device)
 karpathy_gpt = karpathy_gpt.to(device)
 

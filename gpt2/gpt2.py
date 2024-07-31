@@ -7,9 +7,12 @@ import tiktoken
 import math
 import time
 
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+
 @dataclass
 class GPTconfig:
-    n_embd: int = 288
+    n_embd: int = 768
     n_head: int = 12
     n_layer: int = 12
     block_size: int = 1024
@@ -43,7 +46,6 @@ class FeedForward(nn.Module):
         x = self.drop(x)
         return x
     
-
 class CausalSelfAttention(nn.Module):
 
     def __init__(self, config):
@@ -95,7 +97,7 @@ class Block(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.ln_1 = nn.LayerNorm(config.n_embd)
+        self.ln_1 = nn.LayerNorm(config.n_embd, config.bias)
         self.attn = CausalSelfAttention(config)
         self.ln_2 = nn.LayerNorm(config.n_embd, bias=config.bias)
         self.mlp = FeedForward(config)
@@ -119,7 +121,8 @@ class GPT(nn.Module):
         ))
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        
+        self.apply(self._init_weights)
+
         self.transformer.wte.weight = self.lm_head.weight
         for pn, p in self.named_parameters():
             if pn.endswith('c_proj.weight'):
@@ -127,7 +130,6 @@ class GPT(nn.Module):
         
         print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
 
-        self.apply(self._init_weights)
 
     def get_num_params(self, non_embedding=True):
 
@@ -138,10 +140,7 @@ class GPT(nn.Module):
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
-            std = 0.02
-            if hasattr(module, 'NANOGPT_SCALE_INIT'):
-                std *= (2 * self.config.n_layer) ** -0.5
-            torch.nn.init.normal_(module.weight, mean=0.0, std=std)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
@@ -152,7 +151,6 @@ class GPT(nn.Module):
 
         assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}, 'Model type not supported.'
         from transformers import GPT2LMHeadModel
-
         print('Loading model from pretrained gpt %s' % model_type)
 
         config_args = {
@@ -164,6 +162,7 @@ class GPT(nn.Module):
 
         config_args['vocab_size'] = 50257
         config_args['block_size'] = 1024
+        config_args['bias'] = True
 
         config = GPTconfig(**config_args)
         model = GPT(config)
@@ -174,22 +173,21 @@ class GPT(nn.Module):
         sd_keys = [k for k in sd_keys if not k.endswith('.attn.bias')]
 
         model_hf = GPT2LMHeadModel.from_pretrained(model_type)
-
         sd_hf = model_hf.state_dict()
+
         sd_keys_hf = sd_hf.keys()
         sd_keys_hf = [k for k in sd_keys_hf if not k.endswith('.attn.bias')]
         sd_keys_hf = [k for k in sd_keys_hf if not k.endswith('.attn.masked_bias')]
+
         transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
 
         assert len(sd_keys_hf) == len(sd_keys), f"mismatched keys: {len(sd_keys_hf)} != {len(sd_keys)}"
         for k in sd_keys_hf:
             if any(k.endswith(w) for w in transposed):
-                # special treatment for the Conv1D weights we need to transpose
                 assert sd_hf[k].shape[::-1] == sd[k].shape
                 with torch.no_grad():
                     sd[k].copy_(sd_hf[k].t())
             else:
-                # vanilla copy over the other parameters
                 assert sd_hf[k].shape == sd[k].shape
                 with torch.no_grad():
                     sd[k].copy_(sd_hf[k])

@@ -54,6 +54,7 @@ class DataLoaderLite:
 train_loader = DataLoaderLite(B, T)
 
 model = GPT(config)
+# model = GPT.from_pretrained('gpt2')
 # model = torch.nn.Module.compile(model) possible optim?
 model = model.to(device)
 
@@ -61,12 +62,12 @@ wandb.login()
 
 wandb.init(project='gpt2',
            config={
-                'n_embd': 288,
+                'n_embd': 768,
                 'n_head': 12,
                 'n_layer': 12,
-                'block_size': 512,
+                'block_size': 1024,
                 'vocab_size': 50304,
-                'dropout': 0.1
+                'dropout': 0.0
            })
 
 def get_lr(step):
