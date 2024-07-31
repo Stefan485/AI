@@ -10,7 +10,7 @@ max_lr = 6e-4
 min_lr = max_lr * 0.1
 num_return_sequece = 5
 max_new_tokens = 50
-max_steps = 100
+max_steps = 50
 warmup_steps = 10
 enc = tiktoken.get_encoding('gpt2')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -68,23 +68,24 @@ def get_lr(step):
     return min_lr + coeff * (max_lr - min_lr) * coeff
 
 optimizer_my_gpt = my_gpt.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, betas=(0.9, 0.95), device_type=device)
-optimizer_karpathy_gpt = karpathy_gpt.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, betas=(0.9, 0.95), device_type=device)
+optimizer_karpathy_gpt = karpathy_gpt.configure_optimizers(weight_decay=0.1, learning_rate=6e-4,
+                                                            betas=(0.9, 0.95), device_type=device, zero_stage=0)
 
 def compare_weights(weights1, weights2):
     assert weights1.keys() == weights2.keys(), 'Models have different parameters'
     differences = {}
-    tensors_of_intrest = ['mlp.c_proj', 'mlp.c_fc']
-    keys = []
-    for x in weights1.keys():
-        if any(y in x for y in tensors_of_intrest):
-            keys.append(x)
+    # tensors_of_intrest = ['mlp.c_proj', 'mlp.c_fc']
+    # keys = []
+    # for x in weights1.keys():
+        # if any(y in x for y in tensors_of_intrest):
+            # keys.append(x)
    
-    print(keys)
-    s = set(keys)
-    # s = set(weights1.keys())
+    # print(keys)
+    # s = set(keys)
+    s = set(weights1.keys())
     assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
                 in zip(weights1.items(), weights2.items())), 'Models have different weights'
-    # print("passed")
+    print("passed")
     for k in s:
         w1 = weights1[k]
         w2 = weights2[k]
@@ -92,16 +93,17 @@ def compare_weights(weights1, weights2):
         rel_error = abs_error / (torch.abs(w1) + 1e-5)
         abs_mean = abs_error.mean()
         rel_mean = rel_error.mean()
-        differences[k] = f'abs_mean: {abs_mean:.4f}, rel_mean: {rel_mean:.4f}'
+        if abs_mean and rel_mean != 0.0:
+            differences[k] = f'abs_mean: {abs_mean:.4f}, rel_mean: {rel_mean:.4f}'
 
     differences = dict(sorted(differences.items()))
     print(differences)
 
 
 for step in range(max_steps):
+    print(f'step: {step}')
     weights1, weights2 = my_gpt.state_dict(), karpathy_gpt.state_dict()
     compare_weights(weights1, weights2)
-    print(f'step: {step}')
     x, y = train_loader.next_batch()    
     x, y = x.to(device), y.to(device)
 

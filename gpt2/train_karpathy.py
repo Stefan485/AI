@@ -69,7 +69,7 @@ def get_lr(step):
     return min_lr + coeff * (max_lr - min_lr) * coeff
 
 #from gpt paper
-optimizer = model.configure_optimizers(0.1, 6e-4, (0.9, 0.95), device)
+optimizer = model.configure_optimizers(0.1, 6e-4, (0.9, 0.95), device, 0)
 
 wandb.login()
 
