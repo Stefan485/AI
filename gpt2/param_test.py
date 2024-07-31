@@ -1,11 +1,11 @@
 import torch
 import tiktoken
 from torch.nn import functional as F
-from gpt2 import GPT, GPTconfig
-import time
+import gpt2
+import model_karpathy
 import math
 import numpy as np
-import wandb
+
 
 max_lr = 6e-4
 min_lr = max_lr * 0.1
@@ -14,7 +14,6 @@ max_new_tokens = 50
 max_steps = 100
 warmup_steps = 10
 enc = tiktoken.get_encoding('gpt2')
-config = GPTconfig()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'using device: {device}')
 B = 2 # batch size
@@ -23,9 +22,8 @@ torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 torch.set_float32_matmul_precision('high')
 
-
 class DataLoaderLite:
-
+    
     def __init__(self, B, T):
         self.B = B
         self.T = T
@@ -49,25 +47,13 @@ class DataLoaderLite:
         if self.current_position + B * T + 1 >= len(self.tokens):
             self.current_position = 0
         return x, y 
-
-
+    
 train_loader = DataLoaderLite(B, T)
 
-model = GPT(config)
-# model = torch.nn.Module.compile(model) possible optim?
-model = model.to(device)
-
-wandb.login()
-
-wandb.init(project='gpt2',
-           config={
-                'n_embd': 288,
-                'n_head': 12,
-                'n_layer': 12,
-                'block_size': 512,
-                'vocab_size': 50304,
-                'dropout': 0.1
-           })
+my_gpt = gpt2.GPT(gpt2.GPTconfig())
+karpathy_gpt = model_karpathy.GPT(model_karpathy.GPTConfig())
+my_gpt = my_gpt.to(device)
+karpathy_gpt = karpathy_gpt.to(device)
 
 def get_lr(step):
     if step < warmup_steps:
@@ -81,60 +67,55 @@ def get_lr(step):
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     return min_lr + coeff * (max_lr - min_lr) * coeff
 
-# optimizer = torch.optim.AdamW(model.parameters(), lr=6e-4, betas=(0.9, 0.95), eps=1e-8, weight_decay=0.1, fused=True)
-optimizer = model.configure_optimizers(0.1, max_lr, (0.9, 0.95), device)
+optimizer_my_gpt = my_gpt.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, betas=(0.9, 0.95), device_type=device)
+optimizer_karpathy_gpt = karpathy_gpt.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, betas=(0.9, 0.95), device_type=device)
 
-#used for training my implementation and logging to wandb
+def compare_weights(weights1, weights2):
+    assert weights1.keys() == weights2.keys(), 'Models have different parameters'
+    differences = {}
+    # keys = [x for x in weights1.keys() if 'bias' not in x]
+    # s = set(keys)
+    s = set(weights1.keys())
+    # assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
+    #             in zip(weights1.items(), weights2.items())), 'Models have different weights'
+    for k in s:
+        w1 = weights1[k]
+        w1 = w1.to('cpu').numpy()
+        w2 = weights2[k]
+        w2 = w2.to('cpu').numpy()
+        diff = np.linalg.norm(w1 - w2)
+        differences[k] = diff
+
+    differences = dict(sorted(differences.items()))
+    print(differences)
+
+
 for step in range(max_steps):
-    t0 = time.time()
+    print(f'step: {step}')
     x, y = train_loader.next_batch()    
     x, y = x.to(device), y.to(device)
 
-    optimizer.zero_grad()
-    logits, loss = model(x, y)
+    optimizer_my_gpt.zero_grad()
+    logits, loss = my_gpt(x, y)
     loss.backward()
-    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-    optimizer.step()
+    norm = torch.nn.utils.clip_grad_norm_(my_gpt.parameters(), 1.0)
+    optimizer_my_gpt.step()
 
     torch.cuda.synchronize()
-    t1 = time.time()
-    dt = (t1 - t0)*1000
     lr = get_lr(step)
-    for param_group in optimizer.param_groups:
+    for param_group in optimizer_my_gpt.param_groups:
         param_group['lr'] = lr
 
-    # metrics = {'loss': loss.item(), 'lr': lr}
-    
-    # wandb.log(metrics)
-    print(f'step: {step}, loss: {loss.item(),} dt: {dt:.2f}ms')
+    optimizer_karpathy_gpt.zero_grad()
+    logits, loss = karpathy_gpt(x, y)
+    loss.backward()
+    norm = torch.nn.utils.clip_grad_norm_(karpathy_gpt.parameters(), 1.0)
+    optimizer_karpathy_gpt.step()
 
+    torch.cuda.synchronize()
+    lr = get_lr(step)
+    for param_group in optimizer_karpathy_gpt.param_groups:
+        param_group['lr'] = lr
 
-# Generate text
-tokens = enc.encode("Hello I'm a language model,")
-tokens = torch.tensor(tokens, dtype=torch.long)
-tokens = tokens.unsqueeze(0).repeat(num_return_sequece, 1)
-x = tokens.to(device)
-
-model.eval()
-while x.size(1) < max_new_tokens:
-    with torch.no_grad():
-
-        logits, loss = model(x)
-
-        logits = logits[:, -1, :]
-        probs = F.softmax(logits, dim=-1)
-
-        topk_probs, topk_indices = torch.topk(probs, k=50, dim=-1)
-
-        ix = torch.multinomial(topk_probs, 1)
-        xcol = torch.gather(topk_indices, -1, ix)
-
-        x = torch.cat((x, xcol), dim=1)
-
-
-for i in range(num_return_sequece):
-    tokens = x[i, :max_new_tokens].tolist()
-    decode = enc.decode(tokens)
-    print("> ", decode)
-
-wandb.finish()
+    weights1, weights2 = my_gpt.state_dict(), karpathy_gpt.state_dict()
+    compare_weights(weights1, weights2)
