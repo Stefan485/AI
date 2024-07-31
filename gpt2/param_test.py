@@ -82,6 +82,7 @@ def compare_weights(weights1, weights2):
    
     # print(keys)
     # s = set(keys)
+    print(weights1.keys())
     s = set(weights1.keys())
     assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
                 in zip(weights1.items(), weights2.items())), 'Models have different weights'
@@ -100,10 +101,10 @@ def compare_weights(weights1, weights2):
     print(differences)
 
 
-for step in range(max_steps):
+for step in range(1):
     print(f'step: {step}')
     weights1, weights2 = my_gpt.state_dict(), karpathy_gpt.state_dict()
-    compare_weights(weights1, weights2)
+    # compare_weights(weights1, weights2)
     x, y = train_loader.next_batch()    
     x, y = x.to(device), y.to(device)
 
@@ -128,3 +129,42 @@ for step in range(max_steps):
     optimizer_karpathy_gpt.step()
 
     torch.cuda.synchronize()
+
+#transformer.h.0.ln_1
+#transformer.h.0.attn
+#transformer.h.0.mlp.c_fc
+#transformer.h.0.mlp.c_proj
+activation = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activation[name] = output
+    return hook
+
+my_gpt.transformer.h[0].ln_1.register_forward_hook(get_activation('my_gpt.transformer.h.0.ln_1'))
+my_gpt.transformer.h[0].attn.register_forward_hook(get_activation('my_gpt.transformer.h.0.attn'))
+my_gpt.transformer.h[0].mlp.c_fc.register_forward_hook(get_activation('my_gpt.transformer.h.0.mlp.c_fc'))
+my_gpt.transformer.h[0].mlp.c_proj.register_forward_hook(get_activation('my_gpt.transformer.h.0.mlp.c_proj'))
+karpathy_gpt.transformer.h[0].ln_1.register_forward_hook(get_activation('karpathy_gpt.transformer.h.0.ln_1'))
+karpathy_gpt.transformer.h[0].attn.register_forward_hook(get_activation('karpathy_gpt.transformer.h.0.attn'))
+karpathy_gpt.transformer.h[0].mlp.c_fc.register_forward_hook(get_activation('karpathy_gpt.transformer.h.0.mlp.c_fc'))
+karpathy_gpt.transformer.h[0].mlp.c_proj.register_forward_hook(get_activation('karpathy_gpt.transformer.h.0.mlp.c_proj'))
+
+my_gpt.eval()
+karpathy_gpt.eval()
+tokens = enc.encode("Hello I'm a ")
+tokens = torch.tensor(tokens, dtype=torch.long)
+
+output = my_gpt(tokens.unsqueeze(0).to(device))
+print(activation['my_gpt.transformer.h.0.ln_1'])
+output = karpathy_gpt(tokens.unsqueeze(0).to(device))
+print(activation['karpathy_gpt.transformer.h.0.ln_1'])
+
+print('----------------------------SECOND TEST---------------------------------')
+
+tokens = enc.encode("Hello I'm a language model,")
+tokens = torch.tensor(tokens, dtype=torch.long)
+
+output = my_gpt(tokens.unsqueeze(0).to(device))
+print(activation['my_gpt.transformer.h.0.ln_1'])
+output = karpathy_gpt(tokens.unsqueeze(0).to(device))
+print(activation['karpathy_gpt.transformer.h.0.ln_1'])
