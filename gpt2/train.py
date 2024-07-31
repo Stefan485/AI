@@ -85,9 +85,9 @@ def get_lr(step):
 # optimizer = torch.optim.AdamW(model.parameters(), lr=6e-4, betas=(0.9, 0.95), eps=1e-8, weight_decay=0.1, fused=True)
 optimizer = model.configure_optimizers(0.1, max_lr, (0.9, 0.95), device)
 
-#used for training my implementation and logging to wandb
 for step in range(max_steps):
     t0 = time.time()
+
     x, y = train_loader.next_batch()    
     x, y = x.to(device), y.to(device)
 
@@ -95,6 +95,7 @@ for step in range(max_steps):
     logits, loss = model(x, y)
     loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
     lr = get_lr(step)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
@@ -104,9 +105,7 @@ for step in range(max_steps):
     t1 = time.time()
     dt = (t1 - t0)*1000
 
-
     metrics = {'loss': loss.item(), 'lr': lr}
-    
     wandb.log(metrics)
     print(f'step: {step}, loss: {loss.item(),} dt: {dt:.2f}ms')
 

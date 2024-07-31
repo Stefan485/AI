@@ -34,9 +34,9 @@ class FeedForward(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
-        self.gelu    = nn.GELU(approximate='tanh')
-        self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
+        self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
+        self.gelu = nn.GELU(approximate='tanh')
+        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
         self.drop = nn.Dropout(config.dropout)
 
     def forward(self, x):
@@ -52,8 +52,8 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         assert config.n_embd % config.n_head == 0
 
-        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
-        self.c_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
+        self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
         self.attn_drop = nn.Dropout(config.dropout)
         self.resid_drop = nn.Dropout(config.dropout)
         # self.c_proj.NANOGPT_SCALE_INIT = 1
