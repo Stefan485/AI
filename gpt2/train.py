@@ -53,8 +53,8 @@ class DataLoaderLite:
 
 train_loader = DataLoaderLite(B, T)
 
-model = GPT(config)
-# model = GPT.from_pretrained('gpt2')
+# model = GPT(config)
+model = GPT.from_pretrained('gpt2')
 # model = torch.nn.Module.compile(model) possible optim?
 model = model.to(device)
 
@@ -95,14 +95,15 @@ for step in range(max_steps):
     logits, loss = model(x, y)
     loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    lr = get_lr(step)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
     optimizer.step()
 
     torch.cuda.synchronize()
     t1 = time.time()
     dt = (t1 - t0)*1000
-    lr = get_lr(step)
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
+
 
     metrics = {'loss': loss.item(), 'lr': lr}
     

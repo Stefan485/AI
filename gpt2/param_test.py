@@ -78,6 +78,7 @@ def compare_weights(weights1, weights2):
     s = set(weights1.keys())
     # assert all(torch.allclose(t1, t2) and k1 == k2 for (k1, t1), (k2, t2) #Doesn't pass the test
     #             in zip(weights1.items(), weights2.items())), 'Models have different weights'
+    print("passed")
     for k in s:
         w1 = weights1[k]
         w2 = weights2[k]
@@ -102,23 +103,25 @@ for step in range(max_steps):
     logits, loss = my_gpt(x, y)
     loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(my_gpt.parameters(), 1.0)
-    optimizer_my_gpt.step()
-
-    torch.cuda.synchronize()
     lr = get_lr(step)
     for param_group in optimizer_my_gpt.param_groups:
         param_group['lr'] = lr
+    optimizer_my_gpt.step()
+
+    torch.cuda.synchronize()
+
 
     optimizer_karpathy_gpt.zero_grad()
     logits, loss = karpathy_gpt(x, y)
     loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(karpathy_gpt.parameters(), 1.0)
-    optimizer_karpathy_gpt.step()
-
-    torch.cuda.synchronize()
     lr = get_lr(step)
     for param_group in optimizer_karpathy_gpt.param_groups:
         param_group['lr'] = lr
+    optimizer_karpathy_gpt.step()
+
+    torch.cuda.synchronize()
+
 
     weights1, weights2 = my_gpt.state_dict(), karpathy_gpt.state_dict()
     compare_weights(weights1, weights2)
