@@ -15,7 +15,7 @@ class GPTconfig:
     block_size: int = 1024
     vocab_size: int = 50304
     dropout: float = 0.0
-    bias = True
+    bias: bool = True
 
 class LayerNorm(nn.Module):
 
@@ -27,14 +27,13 @@ class LayerNorm(nn.Module):
     def forward(self, input):
         return F.layer_norm(input, self.weight.shape, self.weight, self.bias, 1e-5)
 
-
 class FeedForward(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd)
+        self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
         self.gelu    = nn.GELU()
-        self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd)
+        self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
         self.drop = nn.Dropout(config.dropout)
 
     def forward(self, x):
@@ -92,7 +91,6 @@ class CausalSelfAttention(nn.Module):
         y = self.c_proj(y)
         return self.resid_drop(y)
 
-    
 class Block(nn.Module):
 
     def __init__(self, config):

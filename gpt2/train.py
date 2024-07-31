@@ -103,9 +103,9 @@ for step in range(max_steps):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-    # metrics = {'loss': loss.item(), 'lr': lr}
+    metrics = {'loss': loss.item(), 'lr': lr}
     
-    # wandb.log(metrics)
+    wandb.log(metrics)
     print(f'step: {step}, loss: {loss.item(),} dt: {dt:.2f}ms')
 
 

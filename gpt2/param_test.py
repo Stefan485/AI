@@ -80,17 +80,20 @@ def compare_weights(weights1, weights2):
     #             in zip(weights1.items(), weights2.items())), 'Models have different weights'
     for k in s:
         w1 = weights1[k]
-        w1 = w1.to('cpu').numpy()
         w2 = weights2[k]
-        w2 = w2.to('cpu').numpy()
-        diff = np.linalg.norm(w1 - w2)
-        differences[k] = diff
+        abs_error = torch.abs(w1 - w2)
+        rel_error = abs_error / (torch.abs(w1) + 1e-5)
+        abs_mean = abs_error.mean()
+        rel_mean = rel_error.mean()
+        differences[k] = f'abs_mean: {abs_mean:.4f}, rel_mean: {rel_mean:.4f}'
 
     differences = dict(sorted(differences.items()))
     print(differences)
 
 
 for step in range(max_steps):
+    weights1, weights2 = my_gpt.state_dict(), karpathy_gpt.state_dict()
+    compare_weights(weights1, weights2)
     print(f'step: {step}')
     x, y = train_loader.next_batch()    
     x, y = x.to(device), y.to(device)
